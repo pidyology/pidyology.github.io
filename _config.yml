@@ -96,9 +96,7 @@ analytics:
 author:
   name             : "DongHyeon-Lee(Daniel)"
   avatar           : # path of avatar image, e.g. "/assets/images/bio-photo.jpg"
-  bio              : "뭔가를 시작하려면 어느정도의 오해와 환상이 필요하다고 생각합니다. 
-  지금은 프로그래밍과 조금씩 오해를 풀어가기 시작하고 있습니다. 
-  수학은 좋아하지만 그리 지식이 깊진 않습니다."
+  bio              : "I think starting something requires some misunderstanding and fantasy about it."
   location         : "I'm in Seoul"
   email            :
   links:
