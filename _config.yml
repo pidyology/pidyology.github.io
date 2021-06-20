@@ -15,12 +15,12 @@
 minimal_mistakes_skin    : "air" # "air", "aqua", "contrast", "dark", "dirt", "neon", "mint", "plum", "sunrise"
 
 # Site Settings
-locale                   : "en-US"
-title                    : "Pidyology's Study Notes"
+locale                   : "ko"
+title                    : "폐관수련 블로그"
 title_separator          : "-"
 subtitle                 : # site tagline that appears below site title in masthead
-name                     : "DongHyeon-Lee(Daniel)"
-description              : "An amazing website."
+name                     : "이동현(Daniel)"
+description              : "휴학하고 공부한거 올리려고 만든 블로그"
 url                      : "https://pidyology.github.io"
 baseurl                  : # the subpath of your site, e.g. "/blog"
 repository               : # GitHub username/repo-name e.g. "mmistakes/minimal-mistakes"
@@ -95,9 +95,9 @@ analytics:
 
 # Site Author
 author:
-  name             : "DongHyeon-Lee(Daniel)"
+  name             : "이동현(Daniel)"
   avatar           : # path of avatar image, e.g. "/assets/images/bio-photo.jpg"
-  bio              : "I think starting something requires some misunderstanding and fantasy about it."
+  bio              : "모든 시작엔 적당한 오해와 환상이 필요하다고 생각합니다."
   location         : "Seoul, Korea"
   email            :
   links:
