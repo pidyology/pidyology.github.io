@@ -1,0 +1,309 @@
+---
+title: "전산통계 10장 노트"
+author: "daniel"
+date: '2021 6 16 '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 10장 목차
+>1. 동기  
+2. a : **익명함수**(anonoymus function)  
+3. c : **클로저**(closures)
+4. l : **함수 리스트**(list of functions)
+5. 수치적분예제  
+  
+> 등장하는 함수들  
+set.seed(), replicate(), sample(), names(), vector(), length(), seq_along(), lapply(), mean(), median(), sd(), mad(), IQR(), unique(), Filter(), is.numeric(), sin(), integrate(), formals(), body(), environment(), power(), square(), cube(), as.list(), unenclose(), colorRampPalette(), typeof(), class(), par(), rep(), plot(), draw(), rnorm(), topo.colors(), log(), runif(), moment(), stopifnot(), all.equal(), var(), pick(), system.time(), force(), paste0(), setNames(), attach(), detach(), list2env(), rm(), 
+
+
+## 1. Motivation
+**일급함수**  
+  
+s : **심볼(symbol)**에 함수를 할당할 수 있음  
+a : 함수를 **입력항목(argument)**으로 전달할 수 있음  
+r : 함수를 **반환값(return)**으로 하는 함수를 작성할 수 있음  
+  
+
+```{r}
+set.seed(1014)
+replicate(6, sample(c(1:10, -99), 6, rep = T))
+
+set.seed(1014)
+df <- data.frame(replicate(6, sample(c(1:10, -99), 6, rep = T)))
+names(df) <- letters[1:6]
+
+df
+```
+> 이런 상황에서 일일이 결측치를 NA로 수정하는 것이 아니라 함수를 통해 일괄적으로 결측치를 처리하고싶다.
+
+```{r}
+fix_missing <- function(x){
+  x[x == -99] <- NA
+  x
+}
+```
+> 하지만 이건 데이터프레임의 각 열만을 수정하는 함수이므로 lapply()를 사용
+
+```{r}
+df <- data.frame(lapply(df, fix_missing))
+df
+```
+> lapply(**리스트**, **원소별** 적용함수, ...)와 같은 문법으로 사용할 수 있음  
+for loop로 비슷하게 구현하면 아래와 같음
+
+```{r, eval = FALSE}
+lapply2 <- function(x, f, ...){
+  out <- vector('list', length(x)) # 길이가 length(x)인 리스트를 만듦
+  for (i in seq_along(x)) { # x의 길이만큼 루프
+    out[[i]] <- f(x[[i]], ...) # x의 i번째 
+  }
+  out # out 리턴
+}
+```
+> lapply()로부터 **함수형**(functionals)의 의미를 추측해보자.  
+*  FAA : Function As an Argument (**takes a function as an argument**)  
+
+> 함수형(functionals)를 사용했을 때 **장점**은 무엇인가?  
+*  C : It is more **Compact**  
+*  O : It only needs to be **updated in one place**  
+*  M : There is **no way to accidentally miss** a column(element of list)  
+*  T : There is **no way to accidentally treat** one column differently than other
+*  G : It is **easy to generalise this technique to a subset** of columns
+>> 아무래도 Compact해서 가독성이 좋아지는 것이 제일 큰 장점인 것 같다.
+
+```{r, eval = FALSE}
+df[1:5] <- lapply(df[1:5], fix_missing) # Generalise technique to a subset
+```
+> 결측값을 나타내는 값이 여러개라면 fix_missing를 함수공장을 통해 클로저로 만들어 해결할 수 있다. 함수공장은 함수를 반환하는 함수이고 클로저는 그렇게 반환된 함수이다.
+
+```{r}
+missing_fixer <- function(na_value){
+  function(x){
+    x[x == na_value] <- NA
+    x
+  }
+}
+fix_missing_99 <- missing_fixer(-99)
+fix_missing_999 <- missing_fixer(-999)
+
+fix_missing_99(c(-99, -999)) # -99 to NA
+fix_missing_999(c(-99, -999)) # -999 to NA
+```
+### Extra argument
+Argument를 2개 이상 받고싶다.
+
+```{r, eval = FALSE}
+summary <- function(x){
+  c(mean(x), median(x), sd(x), mad(x), IQR(x))
+}
+lapply(df, summary)
+```
+> 이 코드는 NA값을 처리하지 못하는 함수들 덕에 제대로 작동하지 않는다. 어떻게 해야 NA값을 처리하게 만들 수 있을까?
+
+```{r}
+summary <- function(x){
+  c(mean(x, na.rm = TRUE),
+    median(x, na.rm = TRUE),
+    sd(x, na.rm = TRUE),
+    mad(x, na.rm = TRUE),
+    IQR(x, na.rm = TRUE))
+}
+lapply(df, summary)
+```
+> 이제 잘 처리되는 것을 볼 수 있다. 하지만 어떤 경우엔 NA 값이 있으면 에러를 띄웠으면 한다. 매번 na.rm = TRUE를 할 수는 없다.  
+뒤에서 보게될 익명함수 개념과 함수형들의 리스트와 유사한 개념을 사용하면
+
+```{r}
+summary <- function(x) {
+  funs <- c(mean, median, sd, mad, IQR) # 함수들의 벡터(리스트)
+  lapply(funs, function(f) f(x, na.rm = TRUE))
+}
+# lapply(df, summary)
+summary(df$b)
+```
+> 조금 더 개선하면 아래와 같이 할 수도 있다.
+
+```{r}
+summary <- function(x, ...) {
+  funs <- c(mean, median, sd, mad, IQR)
+  lapply(funs, function(f) f(x,...))
+}
+# lapply(df, function(x) summary(x, na.rm = TRUE)) # 이 부분은 더 번잡한듯 하다.
+summary(df$b, na.rm = TRUE) # ... argument까지 사용할 수 있다.
+```
+
+## 2. Anonymous function
+
+> R에서 **함수들은 그 자체로 객체로써 존재**한다. 함수를 생성한다고 해서 자동적으로 심볼에 할당되는 것이 아니다. 타 언어들(e.g., C, C++, Pthon, Ruby)의 문법과 달리 R에는 이름이 있는 함수를 만드는 문법이 따로 없다. 그저 **함수를 만드는 문법이 있고 만들어진 함수를 심볼(이름)에 할당**할 뿐이다. 말하자면 **익명함수가 먼저 있고** 익명함수에 심볼을 붙이는 식이다.  
+  
+  
+> 이름 붙일 필요가 없어보일땐 가차없이 익명함수를 사용하자.
+
+```{r, eval = FALSE}
+lapply(mtcars, function(x) length(unique(x)))
+Filter(function(x) !is.numeric(x), mtcars) # Filter(f, data) : data의 column을 f에 대입한 값이 1인 column만 출력
+integrate(function(x) sin(x) ^ 2, 0, pi) # integrate(f, a, b)
+```
+> R의 모든 함수들이 그렇듯 익명함수 또한 FBE를 가진다.
+
+```{r}
+formals(function(x = 4) g(x) + h(X)) # arguments 정보
+body(function(x = 4) g(x) + h(X))
+environment(function(x = 4) g(x) + h(X)) # parent environment
+```
+> 익명함수는 이름붙이지 않고도 호출이 가능하다.  
+심볼 있는 함수가 호출될 때엔 심볼이 가리키는 함수객체로 부터 실행환경을 만들었다면 익명함수의 경우엔 ()를 통해 방금 만들어진 함수객체를 바로 호출하는 것이다.
+
+```{r}
+# 올바른 호출 예시
+
+(function(x) x+3)(10)
+```
+```{r, eval=FALSE}
+# 이것과 동일
+f <- function(x) x+3
+f(10)
+```
+  
+  
+## 3. Closures
+> “An object is **data with functions**. A closure is a **function with data**.” — John D. Cook
+
+  즉, 객체는 **함수들(메소드들)을 갖는 데이터**이고, 클로저는 **데이터들을 가진 함수**이다.  
+  
+  Objects **DWF** : **D**ata **W**ith **F**unctions  
+  Closures **FWD** : **F**unction **W**ith **D**ata
+> 앞선 익명함수의 중요한 목적은 굳이 이름이 필요없는 작은 함수들을 만드는 것이었다. 여기서 또다른 중요한 목적이 등장하는데 바로 함수들(함수 공장)에 의해 만들어지는 함수인**클로저 생성**이다. 여기서 클로저들은 부모 함수의 환경에 감싸여서(**enclose**) **부모환경의 변수들에 접근하기 위해 부모환경을 데이터로써 가지고있다.** (말하자면 함수인 클로저 **스스로가 어디서 만들어졌는지를 기억**하고 있다고 할 수 있겠다.)  
+그 덕분에 우리는 함수 파라미터에 **계층**을 둘 수 있게 되었다. 예를 들자면 부모단계의 파라미터는 연산(operation)을 제어하고 자식단계의 파라미터는 연산을 수행하는 식이겠다.
+
+```{r}
+power <- function(exponent){ # parameter that controls operation
+  function(x){ # parameter that works operation
+    x ^ exponent
+  }
+}
+
+square <- power(2) # Function With Data of power(2)'s environment
+cube <- power(3) # Function With Data of power(3)'s environment
+
+square(2); square(4); cube(2); cube(4)
+```
+> 보통의 함수들과 달리 클로저를 그대로 출력하면 그닥 쓸데가 없는 정보를 보여준다.
+
+```{r}
+square; cube
+```
+> 이 함수들의 본질은 그저 2와 3을 각각 대입하여 실행한 power함수일 뿐이다. 함수 스스로는 변하지 않기 때문에 power를 출력해준다. 그나마 다른점은 감싸서 접근하고 있는 환경이다. 환경을 들여다 보려면 환경을 리스트로 변환해야한다.
+
+```{r}
+as.list(environment(square))
+as.list(environment(cube))
+```
+> 환경을 들여다 보는 또다른 방법으로는 pryr라이브러리의 unenclose()함수를 사용하는 것이다.
+
+```{r}
+library(pryr) # 왜인지 맨날 pypr 이나 pyry랑 헷갈린다...
+unenclose(square)
+unenclose(cube)
+```
+> **클로저의 부모 환경은 자신이 만들어진 실행환경이다.**
+
+```{r}
+# 중요!!!!
+
+power <- function(exponent){
+  print(environment()) # 함수가 실행될 때 실행환경을 출력
+  function(x) x ^ exponent
+}
+zero <- power(0) # 아래와 비교해보자.
+environment(zero) # power(0)의 실행환경이 사라지지 않아!....
+```
+> 일반적으로 함수의 실행환경은 값이 리턴되면서 사라진다. 하지만 클로저는 자기 자신을 둘러싸고 있는 환경을 캡쳐(capture)하고 있다. 분명 클로저가 부모함수에서 리턴 되었지만 부모함수의 실행환경은 클로저의 정보로 저장되어 사라지지 않는다.  
+함수 a가 함수 b를 리턴했지만 함수 b는 자신이 만들어질 때의 환경 즉, a의 실행환경을 캡쳐하고 저장해서 사라지지 않는다는 말이다.(메모리 관리 관점에선 매우 중요한 일이다. 또한 부모환경의 실행환경을 캡쳐함으로써 부모환경의 데이터에 접근을 하게되는데 **random 데이터**가 부모환경에 등록되는 경우 **등록되는 시점에 데이터 값이 고정**이 되므로 시뮬레이션 관점에서도 유용하다.)
+
+> **R에서 모든 함수는 클로저다.** 모든 함수들은 자신이 만들어진 환경(누군가 작성한 함수라면 대게는 글로벌 환경이나 패키지 환경일 것이다.)을 기억하고 있다. **예외라면 C 코드로 직접 작성되어 아무런 환경과 관련 없을 Primitive functions** 뿐이다. 그러니 R에선 함수를 클로저라고 불러도 맞는 말이다.  
+  
+  
+#### 클로저는 **부모환경을 데이터로 갖는 함수**다. 클로저가 아닌 함수는 **Primitive functions** 뿐이다.
+
+### Function factories
+>  
+  **함수 공장은 새로운 함수를 만드는 함수**이다. 이미 앞에서 missing_fixer()와 power() 두 예제로 보았다. 함수공장에 원하는 작업을 나타내는 입력항목들을 넣어 실행하면 원하는 작업을 수행하는 함수가 리턴된다. 사실 missing_fixer()과 power()에서는 함수공장을 사용하는 것이 크게 유용하진 않다.(그냥 단일 함수에 입력항목이 여러개인 것이 좋아보인다.) 함수공장이 힘을 발휘하는 경우는 아래와 같다.  
+  * The **Different Levels** are more **Complex**, with multiple argument and complicated bodies.(**DLC**)  
+  * Some work **only Needs to be done Once**, when the function is **Generated**.(**NOG**)(e.g. load_data in estimation, fit_data in machine learning, layering with models)  
+  
+> 함수공장은 특히 MLE(Maximum Likelyhood Estimation) 문제에서 잘 들어맞고 수학적 함수들 예에서 좋은 용례를 찾아볼 수 있다. 
+
+### Mutable state
+> 여러 단계의 변수를 관리할 수 있다는 것은 함수 호출들 사이에서 상태 유지를 할 수 있음을 의미한다. 이것은 클로저의 실행환경은 매번 새로 리프레시 되지만 클로저를 감싼 부모환경은 일정하기에 가능한 것이었다. 여러단계의 변수를 관리하는 것의 핵심은 **the double arrow assignment operator(<<-)**이다. 현재 환경에서 할당하는 <-와는 달리 <<-는 **할당하는 심볼을 찾을 때까지 부모환경을 차례로 탐색**해 나간다.(GlobalEnv까지 없으면 GlobalEnv에서 새로운 변수를 만들어 할당)
+
+```{r}
+new_counter <- function() {
+  i <- 0
+  function() {
+    i <<- i + 1 # 함수 내에서 i가 따로 정의되지 않았으므로 부모환경의 i를 가져와서 1을 더하고 부모환경의 i에 할당한다.
+    i # 위에서 등록한 i는 부모환경에 있으므로 부모환경의 i를 리턴한다.
+  }
+}
+
+counter_one <- new_counter()
+counter_two <- new_counter()
+# one과 two는 서로 다른 시점에 만들어 졌으므로 서로 다른 부모환경을 캡쳐한다.
+# 따라서 둘은 서로 다른 클로저이다.
+```
+
+```{r}
+counter_one() # 부모환경의 i가 0에서 1이 되었다.
+counter_one() # 부모환경의 i가 1에서 2이 되었다.
+counter_two() # one과 two는 서로 다른 부모환경을 캡쳐했다.
+```
+> 클로저를 사용하지 않는다면? <<-대신 <-이 들어간다면? 어떻게 될까?
+
+```{r}
+# 클로저를 사용하지 않을 때
+i <- 0
+new_counter2 <- function() {
+  i <<- i + 1
+  i
+}
+counter2_one <- new_counter2 # 함수를 리턴하지 않으므로 그대로 전달
+counter2_two <- new_counter2
+
+counter2_one()
+counter2_one()
+counter2_two()
+```
+
+
+```{r}
+# <<-대신 <-이 들어갈때
+new_counter3 <- function() {
+  i <- 0
+  function() {
+    i <- i + 1
+    i
+  }
+}
+
+counter3_one <- new_counter3()
+counter3_two <- new_counter3()
+
+counter3_one()
+counter3_one()
+counter3_two()
+```
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
